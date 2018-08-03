@@ -25,6 +25,8 @@ from carla import image_converter
 import h5py
 import numpy as np
 import os
+import sys
+import termios
 
 def mkdir(path):
     path = path.strip()
@@ -40,13 +42,47 @@ def fileCounter(path):
     ls = os.listdir(path)
     return len(ls)
 
+def press_any_key_exit(msg):
+    # 获取标准输入的描述符
+    fd = sys.stdin.fileno()
+    # 获取标准输入(终端)的设置
+    old_ttyinfo = termios.tcgetattr(fd)
+    # 配置终端
+    new_ttyinfo = old_ttyinfo[:]
+    # 使用非规范模式(索引3是c_lflag 也就是本地模式)
+    new_ttyinfo[3] &= ~termios.ICANON
+    # 关闭回显(输入不会被显示)
+    new_ttyinfo[3] &= ~termios.ECHO
+    # 输出信息
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+    # 使设置生效
+    termios.tcsetattr(fd, termios.TCSANOW, new_ttyinfo)
+    # 从终端读取
+    os.read(fd, 7)
+    # 还原终端设置
+    termios.tcsetattr(fd, termios.TCSANOW, old_ttyinfo)
+
 def record_train_data(measurements,sensor_data):
+
+    ## Collect sensordata->sensors
     # Grey = 0.299 * R + 0.587 * G + 0.114 * B
     rgb_array = np.uint8(0.299 * sensor_data['CameraRGB'].data[:, :, 0] + 0.587 * sensor_data['CameraRGB'].data[:, :, 1] + 0.114 * sensor_data['CameraRGB'].data[:, :, 2])
     seg_array = sensor_data.get('CameraSemSeg', None).data
-    # seg_image = sensor_data.get('CameraSemSeg', None)
-    # seg_array = image_converter.labels_to_cityscapes_palette(seg_image)
-    # seg_array = seg_array[:,:,0]
+    lidar_measurement = sensor_data.get('Lidar32', None)
+    lidar_data = np.array(lidar_measurement.data[:, :2])
+    lidar_data *= 2.0
+    lidar_data += 100.0
+    lidar_data = np.fabs(lidar_data)
+    lidar_data = lidar_data.astype(np.int32)
+    lidar_data = np.reshape(lidar_data, (-1, 2))
+    # draw lidar
+    lidar_img_size = (200, 200)
+    lidar_img = np.zeros(lidar_img_size)
+    lidar_img[tuple(lidar_data.T)] = 255
+    sensors = {'rgb':rgb_array, 'seg':seg_array, 'lidar':lidar_img}
+
+    ## collect measurementdata->targets
     player_measurements = measurements.player_measurements
     control = measurements.player_measurements.autopilot_control
     steer = control.steer
@@ -81,7 +117,7 @@ def record_train_data(measurements,sensor_data):
                pos_x,pos_y,speed,col_other,col_ped,col_cars,other_lane,offroad,
                acc_x,acc_y,acc_z,platform_time,game_time,orientation_x,orientation_y,orientation_z,
                command,noise,camera,angle]
-    return rgb_array,seg_array,targets
+    return sensors,targets
 
 
 def run_carla_client(args):
@@ -99,6 +135,7 @@ def run_carla_client(args):
     with make_carla_client(args.host, args.port) as client:
         print('CarlaClient connected')
         for episode in range(0, number_of_episodes):
+            print("input any key to continue...")
             start = input()
             # each episode dir store a set of traindata.  if dir not existed, then make it
             pathdir = '/home/kadn/dataTrain/episode_{:0>3}'.format(episode)
@@ -145,12 +182,12 @@ def run_carla_client(args):
             lidar.set_position(0, 0, 2.50)
             lidar.set_rotation(0, 0, 0)
             lidar.set(
-                Channels=32,
-                Range=50,
-                PointsPerSecond=100000,
+                Channels=0,
+                Range=30,
+                PointsPerSecond=200000,
                 RotationFrequency=10,
-                UpperFovLimit=10,
-                LowerFovLimit=-30)
+                UpperFovLimit=0,
+                LowerFovLimit=0)
             settings.add_sensor(lidar)
 
             # else:
@@ -184,6 +221,8 @@ def run_carla_client(args):
                 f = h5py.File(filepath, "w")
                 rgb_file = f.create_dataset("rgb", (200, 88, 200), np.uint8)
                 seg_file = f.create_dataset("seg", (200, 88, 200), np.uint8)
+                lidar_file = f.create_dataset('lidar',(200,200,200),np.uint8)
+                startendpoint = f.create_dataset('startend',(1,2),np.float32)
                 targets_file = f.create_dataset("targets", (200, 28), np.float32)
                 index_file = 0
 
@@ -193,9 +232,10 @@ def run_carla_client(args):
                     measurements, sensor_data = client.read_data()
 
                     # get data and store
-                    rgb_data, seg_data, targets_data = record_train_data(measurements,sensor_data)
-                    rgb_file[:,:,index_file] = rgb_data
-                    seg_file[:,:,index_file] = seg_data
+                    sensors, targets_data = record_train_data(measurements,sensor_data)
+                    rgb_file[:,:,index_file] = sensors['rgb']
+                    seg_file[:,:,index_file] = sensors['seg']
+                    lidar_file[:,:,index_file] = sensors['lidar']
                     targets_file[index_file,:] = targets_data
                     index_file += 1
 
