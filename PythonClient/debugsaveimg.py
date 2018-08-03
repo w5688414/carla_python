@@ -69,6 +69,9 @@ def record_train_data(measurements,sensor_data):
     # Grey = 0.299 * R + 0.587 * G + 0.114 * B
     rgb_array = np.uint8(0.299 * sensor_data['CameraRGB'].data[:, :, 0] + 0.587 * sensor_data['CameraRGB'].data[:, :, 1] + 0.114 * sensor_data['CameraRGB'].data[:, :, 2])
     seg_array = sensor_data.get('CameraSemSeg', None).data
+    depth_array = sensor_data.get('CameraDepth', None)
+    depth_array = image_converter.depth_to_logarithmic_grayscale(depth_array)
+    depth_array = depth_array[:,:,0]
     lidar_measurement = sensor_data.get('Lidar32', None)
     lidar_data = np.array(lidar_measurement.data[:, :2])
     lidar_data *= 2.0
@@ -80,7 +83,9 @@ def record_train_data(measurements,sensor_data):
     lidar_img_size = (200, 200)
     lidar_img = np.zeros(lidar_img_size)
     lidar_img[tuple(lidar_data.T)] = 255
-    sensors = {'rgb':rgb_array, 'seg':seg_array, 'lidar':lidar_img}
+    sensors = {'CameraRGB':rgb_array, 'CameraSemSeg':seg_array, 'CameraDepth':depth_array,'Lidar32':lidar_img}
+
+
 
     ## collect measurementdata->targets
     player_measurements = measurements.player_measurements

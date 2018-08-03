@@ -2,10 +2,10 @@ CarlaUE4/
 Engine/
 .idea/
 PythonClient/_benchmarks_results/
+PythonClient/__pycache__/
 PythonClient/carla/__pycache__/
 PythonClient/carla/agent/__pycache__/
 PythonClient/carla/driving_benchmark/__pycache__/
 PythonClient/carla/driving_benchmark/experiment_suites/__pycache__/
 PythonClient/carla/planner/__pycache__/
-PythonClient/testfunction/
 core
