@@ -2,12 +2,10 @@ import h5py
 
 from PIL import Image
 
-f = h5py.File('train06.h5','r')
+f = h5py.File('data_000007.h5','r')
 
-num = 500
-imgs=f['rgb'][:,:,num]
-segs=f['seg'][:,:,num]
+num = 100
+imgs=f['CameraRGB'][:,:,num]
 a = Image.fromarray(imgs)
-seg = Image.fromarray(segs)
 a.show()
-seg.show()
+a.save('a.jpg')

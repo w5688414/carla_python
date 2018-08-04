@@ -83,6 +83,8 @@ LIDAR_WIDTH = 200
 LIDAR_HEIGHT = 200
 NUM = 200
 
+record_dir = '/home/kadn/dataTrain'
+
 
 def make_carla_settings(args):
     """Make a CarlaSettings object with the settings we need."""
@@ -123,7 +125,6 @@ def make_carla_settings(args):
     settings.add_sensor(lidar)
     return settings
 
-
 class Timer(object):
     def __init__(self):
         self.step = 0
@@ -143,7 +144,6 @@ class Timer(object):
     def elapsed_seconds_since_lap(self):
         return time.time() - self._lap_time
 
-
 class CarlaGame(object):
     def __init__(self, carla_client, args):
         self.client = carla_client
@@ -153,7 +153,7 @@ class CarlaGame(object):
         self._main_image = None
         self._mini_view_image1 = None
         self._mini_view_image2 = None
-        self._enable_autopilot = args.autopilot
+        self._enable_autopilot = False
         self._lidar_measurement = None
         self._map_view = None
         self._is_on_reverse = False
@@ -174,29 +174,21 @@ class CarlaGame(object):
         self.targets_file = None
         self.index_file = 200
         self._command = 2
-        self.number_of_episodes = 5
-        self.frames_per_cut = 10000
-
-    # def execute(self):
-    #     """Launch the PyGame."""
-    #     pygame.init()
-    #     self._initialize_game()
-    #     try:
-    #         while True:
-    #             for event in pygame.event.get():
-    #                 if event.type == pygame.QUIT:
-    #                     return
-    #             self._on_loop()
-    #             self._on_render()
-    #     finally:
-    #         pygame.quit()
+        self.number_of_episodes = 1
+        self.frames_per_cut = 1500
 
 
     def execute(self):
         """Launch the PyGame"""
         pygame.init()
         for episode in range(self.number_of_episodes):
-            self.pathdir = '/home/kadn/dataTrain/episode_{:0>3}'.format(episode)
+            #count time
+            time_start = time.time()
+
+            ##run
+            num = len([name for name in os.listdir(record_dir) if name.startswith('episode')])
+            formattednum = 'episode_{:0>3}'.format(num)
+            self.pathdir = os.path.join(record_dir,formattednum)
             mkdir(self.pathdir)
             self._initialize_game()
 
@@ -208,7 +200,10 @@ class CarlaGame(object):
                     if event.type == pygame.QUIT:
                         return
                 self._on_loop()
-                # self._on_render()
+
+            #count time
+            time_end = time.time()
+            print('each episode cost : ', time_end - time_start,'s')
         pygame.quit()
 
     def _create_newfile(self):
@@ -333,71 +328,6 @@ class CarlaGame(object):
             self._command = 5
         control.reverse = self._is_on_reverse
         return control
-
-    def _print_player_measurements_map(
-            self,
-            player_measurements,
-            map_position,
-            lane_orientation):
-        message = 'Step {step} ({fps:.1f} FPS): '
-        message += 'Map Position ({map_x:.1f},{map_y:.1f}) '
-        message += 'Lane Orientation ({ori_x:.1f},{ori_y:.1f}) '
-        message += '{speed:.2f} km/h, '
-        message += '{other_lane:.0f}% other lane, {offroad:.0f}% off-road'
-        message = message.format(
-            map_x=map_position[0],
-            map_y=map_position[1],
-            ori_x=lane_orientation[0],
-            ori_y=lane_orientation[1],
-            step=self._timer.step,
-            fps=self._timer.ticks_per_second(),
-            speed=player_measurements.forward_speed * 3.6,
-            other_lane=100 * player_measurements.intersection_otherlane,
-            offroad=100 * player_measurements.intersection_offroad)
-        print_over_same_line(message)
-
-    def _print_player_measurements(self, player_measurements):
-        message = 'Step {step} ({fps:.1f} FPS): '
-        message += '{speed:.2f} km/h, '
-        message += '{other_lane:.0f}% other lane, {offroad:.0f}% off-road'
-        message = message.format(
-            step=self._timer.step,
-            fps=self._timer.ticks_per_second(),
-            speed=player_measurements.forward_speed * 3.6,
-            other_lane=100 * player_measurements.intersection_otherlane,
-            offroad=100 * player_measurements.intersection_offroad)
-        print_over_same_line(message)
-
-    def _on_render(self):
-
-        if self._map_view is not None:
-            array = self._map_view
-            array = array[:, :, :3]
-
-            new_window_width = \
-                (float(WINDOW_HEIGHT) / float(self._map_shape[0])) * \
-                float(self._map_shape[1])
-            surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-
-            w_pos = int(self._position[0]*(float(WINDOW_HEIGHT)/float(self._map_shape[0])))
-            h_pos = int(self._position[1] *(new_window_width/float(self._map_shape[1])))
-
-            pygame.draw.circle(surface, [255, 0, 0, 255], (w_pos, h_pos), 6, 0)
-            for agent in self._agent_positions:
-                if agent.HasField('vehicle'):
-                    agent_position = self._map.convert_to_pixel([
-                        agent.vehicle.transform.location.x,
-                        agent.vehicle.transform.location.y,
-                        agent.vehicle.transform.location.z])
-
-                    w_pos = int(agent_position[0]*(float(WINDOW_HEIGHT)/float(self._map_shape[0])))
-                    h_pos = int(agent_position[1] *(new_window_width/float(self._map_shape[1])))
-
-                    pygame.draw.circle(surface, [255, 0, 255, 255], (w_pos, h_pos), 4, 0)
-
-            self._display.blit(surface, (WINDOW_WIDTH, 0))
-
-        pygame.display.flip()
 
 def main():
     argparser = argparse.ArgumentParser(
