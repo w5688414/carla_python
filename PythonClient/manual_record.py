@@ -185,11 +185,14 @@ class CarlaGame(object):
             #count time
             time_start = time.time()
 
-            ##run
+            #record
+            mkdir(record_dir)
             num = len([name for name in os.listdir(record_dir) if name.startswith('episode')])
             formattednum = 'episode_{:0>3}'.format(num)
             self.pathdir = os.path.join(record_dir,formattednum)
             mkdir(self.pathdir)
+
+            ##run
             self._initialize_game()
 
             for frame in range(0, self.frames_per_cut):
@@ -211,10 +214,10 @@ class CarlaGame(object):
         filename = "data_{:0>6}.h5".format(num)
         filepath = self.pathdir + '/' + filename
         self.f = h5py.File(filepath, "w")
-        self.rgb_file = self.f.create_dataset("CameraRGB", (MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, NUM), np.uint8)
-        self.seg_file = self.f.create_dataset("CameraSemSeg", (MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, NUM), np.uint8)
-        self.depth_file = self.f.create_dataset("CameraDepth", (MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, NUM), np.uint8)
-        self.lidar_file = self.f.create_dataset('Lidar32', (LIDAR_HEIGHT, LIDAR_WIDTH, NUM), np.uint8)
+        self.rgb_file = self.f.create_dataset("CameraRGB", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, 3), np.uint8)
+        self.seg_file = self.f.create_dataset("CameraSemSeg", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
+        self.depth_file = self.f.create_dataset("CameraDepth", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
+        self.lidar_file = self.f.create_dataset('Lidar32', (NUM, LIDAR_HEIGHT, LIDAR_WIDTH ), np.uint8)
         self.targets_file = self.f.create_dataset("targets", (NUM, 28), np.float32)
         self.index_file = 0
 
@@ -277,10 +280,10 @@ class CarlaGame(object):
                 and 'CameraSemSeg' in sensor_data \
                 and 'Lidar32' in sensor_data :
             sensors, targets_data = record_train_data(measurements, sensor_data)
-            self.rgb_file[:, :, self.index_file] = sensors['CameraRGB']
-            self.seg_file[:, :, self.index_file] = sensors['CameraSemSeg']
-            self.depth_file[:, :, self.index_file] = sensors['CameraDepth']
-            self.lidar_file[:, :, self.index_file] = sensors['Lidar32']
+            self.rgb_file[self.index_file, :, :, :] = sensors['CameraRGB']
+            self.seg_file[self.index_file, :, :] = sensors['CameraSemSeg']
+            self.depth_file[self.index_file, :, :] = sensors['CameraDepth']
+            self.lidar_file[self.index_file, :, :] = sensors['Lidar32']
             self.targets_file[self.index_file, :] = targets_data
             self.targets_file[self.index_file, 24] = self._command   #24代表的是command
             if self._enable_autopilot:
@@ -305,9 +308,9 @@ class CarlaGame(object):
             return None
         control = VehicleControl()
         if keys[K_LEFT] or keys[K_a]:
-            control.steer = -0.7
+            control.steer = -0.5
         if keys[K_RIGHT] or keys[K_d]:
-            control.steer = 0.7
+            control.steer = 0.5
         if keys[K_UP] or keys[K_w]:
             control.throttle = 0.7
         if keys[K_DOWN] or keys[K_s]:

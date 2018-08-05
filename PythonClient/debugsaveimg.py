@@ -66,8 +66,8 @@ def press_any_key_exit(msg):
 def record_train_data(measurements,sensor_data):
 
     ## Collect sensordata->sensors
-    # Grey = 0.299 * R + 0.587 * G + 0.114 * B
-    rgb_array = np.uint8(0.299 * sensor_data['CameraRGB'].data[:, :, 0] + 0.587 * sensor_data['CameraRGB'].data[:, :, 1] + 0.114 * sensor_data['CameraRGB'].data[:, :, 2])
+    rgb_array = np.uint8(sensor_data['CameraRGB'].data)   # (88*200*3)(宽×高×通道)
+
     seg_array = sensor_data.get('CameraSemSeg', None).data
     depth_array = sensor_data.get('CameraDepth', None)
     depth_array = image_converter.depth_to_logarithmic_grayscale(depth_array)
