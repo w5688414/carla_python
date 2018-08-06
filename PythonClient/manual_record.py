@@ -40,6 +40,7 @@ import termios
 
 try:
     import pygame
+    from pygame.locals import K_ESCAPE
     from pygame.locals import K_DOWN
     from pygame.locals import K_LEFT
     from pygame.locals import K_RIGHT
@@ -83,7 +84,7 @@ LIDAR_WIDTH = 200
 LIDAR_HEIGHT = 200
 NUM = 200
 
-record_dir = '/home/kadn/dataTrain'
+record_dir = '/home/kadn/test'
 
 
 def make_carla_settings(args):
@@ -175,12 +176,21 @@ class CarlaGame(object):
         self.index_file = 200
         self._command = 2
         self.number_of_episodes = 1
-        self.frames_per_cut = 1500
+        self.frames_per_cut = 50000
+        self._joystick_control = 0
 
 
     def execute(self):
         """Launch the PyGame"""
         pygame.init()
+        if pygame.joystick.get_count() > 0:
+            self._joystick_control = 1
+            joystick = pygame.joystick.Joystick(0)
+            joystick.init()
+            print("Please make sure the joystick is on during the whole game!")
+        else:
+            self._joystick_control = 0
+            print("You can plug the joystick in, but it won't work!")
         for episode in range(self.number_of_episodes):
             #count time
             time_start = time.time()
@@ -248,7 +258,7 @@ class CarlaGame(object):
             self._city_name = scene.map_name
         number_of_player_starts = len(scene.player_start_spots)
         # player_start = np.random.randint(number_of_player_starts)
-        player_start = 0
+        player_start = 74
         print('Starting new episode...')
         self.client.start_episode(player_start)
         self._timer = Timer()
@@ -258,7 +268,10 @@ class CarlaGame(object):
 
         measurements, sensor_data = self.client.read_data()
 
-        control = self._get_keyboard_control(pygame.key.get_pressed())
+        if self._joystick_control == 1:
+            control = self._get_joystick_control(pygame.joystick.Joystick(0))
+        else:
+            control = self._get_keyboard_control(pygame.key.get_pressed())
 
         if control is None:
             self._on_new_episode()
@@ -329,6 +342,36 @@ class CarlaGame(object):
             self._command = 4
         if keys[K_5]:
             self._command = 5
+        control.reverse = self._is_on_reverse
+        return control
+
+    def _get_joystick_control(self,joystick):
+        control = VehicleControl()
+        tmp1 = 0.6 * joystick.get_axis(1)
+
+
+
+        if (tmp1 <= 0):
+            control.throttle = -tmp1
+            control.brake = 0
+        else:
+            control.throttle = 0
+            control.brake = tmp1
+
+        control.steer = joystick.get_axis(2)
+        control.steer = 0.7 * control.steer * control.steer * control.steer
+        # print('steer....',control.steer)
+
+        #provide a stable autopilot
+        autopilot = joystick.get_button(0)
+        if autopilot == 1:
+            self._enable_autopilot = not self._enable_autopilot
+
+        # provide a stable reverse
+        reverse = joystick.get_button(2)
+        if reverse == 1:
+            self._is_on_reverse = not self._is_on_reverse
+
         control.reverse = self._is_on_reverse
         return control
 
