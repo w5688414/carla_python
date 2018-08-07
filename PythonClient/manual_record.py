@@ -207,10 +207,10 @@ class CarlaGame(object):
         for episode in range(self.number_of_episodes):
             self._creat_dir()
             self._initialize_game()
+
             for frame in trange(self.frames_per_cut):
                 if self._check_pygame() == False:
                     return
-
                 # add turbulence
                 if frame % 25 == 0:
                     if np.random.rand() > 0.8:
@@ -223,7 +223,7 @@ class CarlaGame(object):
                 if self._turbulence_start_frame < frame < self._turbulence_stop_frame :
                     self._turbulence = random.randrange(-1, 2, 2)*turbulence_halfsin(frame - self._turbulence_start_frame,
                                                                                     self._turbulence_stop_frame - self._turbulence_start_frame,
-                                                                                     height=0.2)
+                                                                                     height=0.1)
                 else:
                     self._turbulence = 0
 
@@ -315,7 +315,8 @@ class CarlaGame(object):
             self.client.send_control(measurements.player_measurements.autopilot_control)
         else:
             self.client.send_control(control)
-        self._on_record(measurements,sensor_data,control)
+        if record :
+            self._on_record(measurements,sensor_data,control)
 
     def _on_record(self, measurements, sensor_data, control):
         self._create_file()
@@ -387,7 +388,7 @@ class CarlaGame(object):
             control.brake = tmp1
 
         control.steer = joystick.get_axis(2)
-        control.steer = 0.7 * control.steer * control.steer * control.steer
+        control.steer = 0.5 * control.steer * control.steer * control.steer
         # print('steer....',control.steer)
 
         #provide a stable autopilot
