@@ -213,7 +213,7 @@ class CarlaGame(object):
                     return
                 # add turbulence
                 if frame % 25 == 0:
-                    if np.random.rand() > 0.8:
+                    if np.random.rand() > 0.9:
                         self._turbulence_start_frame = frame
                         self._turbulence_stop_frame = frame + np.random.randint(13,24)
                     else:
