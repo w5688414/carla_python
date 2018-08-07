@@ -37,6 +37,7 @@ import numpy as np
 import os
 import sys
 import termios
+from tqdm import trange
 
 try:
     import pygame
@@ -126,6 +127,7 @@ def make_carla_settings(args):
     settings.add_sensor(lidar)
     return settings
 
+
 class Timer(object):
     def __init__(self):
         self.step = 0
@@ -144,6 +146,12 @@ class Timer(object):
 
     def elapsed_seconds_since_lap(self):
         return time.time() - self._lap_time
+
+
+def turbulence_halfsin(i, t, height=0.1):
+    w = (np.pi/t)
+    return height*np.sin(w*i)
+
 
 class CarlaGame(object):
     def __init__(self, carla_client, args):
@@ -176,8 +184,13 @@ class CarlaGame(object):
         self.index_file = 200
         self._command = 2
         self.number_of_episodes = 1
-        self.frames_per_cut = 50000
+        self.frames_per_cut = 1800
         self._joystick_control = 0
+        self._turbulence_start_flag = 0
+        self._turbulence_start_frame = 0
+        self._turbulence_stop_frame = 0
+        self._turbulence_len = 0
+        self._turbulence = 0
 
 
     def execute(self):
@@ -192,44 +205,65 @@ class CarlaGame(object):
             self._joystick_control = 0
             print("You can plug the joystick in, but it won't work!")
         for episode in range(self.number_of_episodes):
-            #count time
-            time_start = time.time()
-
-            #record
-            mkdir(record_dir)
-            num = len([name for name in os.listdir(record_dir) if name.startswith('episode')])
-            formattednum = 'episode_{:0>3}'.format(num)
-            self.pathdir = os.path.join(record_dir,formattednum)
-            mkdir(self.pathdir)
-
-            ##run
+            self._creat_dir()
             self._initialize_game()
+            for frame in trange(self.frames_per_cut):
+                if self._check_pygame() == False:
+                    return
 
-            for frame in range(0, self.frames_per_cut):
-                if(self.index_file == 200):
-                    self._create_newfile()
-                # Read the data produced by the server this frame.
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        return
-                self._on_loop()
+                # add turbulence
+                if frame % 25 == 0:
+                    if np.random.rand() > 0.8:
+                        self._turbulence_start_frame = frame
+                        self._turbulence_stop_frame = frame + np.random.randint(13,24)
+                    else:
+                        self._turbulence_start_frame = -1
+                        self._turbulence_stop_frame = -1
 
-            #count time
-            time_end = time.time()
-            print('each episode cost : ', time_end - time_start,'s')
+                if self._turbulence_start_frame < frame < self._turbulence_stop_frame :
+                    self._turbulence = random.randrange(-1, 2, 2)*turbulence_halfsin(frame - self._turbulence_start_frame,
+                                                                                    self._turbulence_stop_frame - self._turbulence_start_frame,
+                                                                                     height=0.2)
+                else:
+                    self._turbulence = 0
+
+                if frame % 10 == 0:
+                    self._on_loop(record=True, turbulence=self._turbulence)
+                else:
+                    self._on_loop(record=False, turbulence=self._turbulence)
+
         pygame.quit()
 
-    def _create_newfile(self):
-        num = fileCounter(self.pathdir)
-        filename = "data_{:0>6}.h5".format(num)
-        filepath = self.pathdir + '/' + filename
-        self.f = h5py.File(filepath, "w")
-        self.rgb_file = self.f.create_dataset("CameraRGB", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, 3), np.uint8)
-        self.seg_file = self.f.create_dataset("CameraSemSeg", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
-        self.depth_file = self.f.create_dataset("CameraDepth", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
-        self.lidar_file = self.f.create_dataset('Lidar32', (NUM, LIDAR_HEIGHT, LIDAR_WIDTH ), np.uint8)
-        self.targets_file = self.f.create_dataset("targets", (NUM, 28), np.float32)
-        self.index_file = 0
+    def _creat_dir(self):
+        # record
+        mkdir(record_dir)
+        num = len([name for name in os.listdir(record_dir) if name.startswith('episode')])
+        formattednum = 'episode_{:0>3}'.format(num)
+        self.pathdir = os.path.join(record_dir, formattednum)
+        mkdir(self.pathdir)
+
+    def _create_file(self):
+        if (self.index_file == 200):
+            num = fileCounter(self.pathdir)
+            filename = "data_{:0>6}.h5".format(num)
+            filepath = self.pathdir + '/' + filename
+            self.f = h5py.File(filepath, "w")
+            self.rgb_file = self.f.create_dataset("CameraRGB", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, 3), np.uint8)
+            self.seg_file = self.f.create_dataset("CameraSemSeg", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
+            self.depth_file = self.f.create_dataset("CameraDepth", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
+            self.lidar_file = self.f.create_dataset('Lidar32', (NUM, LIDAR_HEIGHT, LIDAR_WIDTH ), np.uint8)
+            self.targets_file = self.f.create_dataset("targets", (NUM, 28), np.float32)
+            self.index_file = 0
+
+    def _check_pygame(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if pygame.key.get_pressed()[K_ESCAPE]:
+                return False
+            if self._joystick_control and pygame.joystick.Joystick(0).get_button(5) and pygame.joystick.Joystick(0).get_button(7):
+                return False
+            return True
 
     def _initialize_game(self):
         self._on_new_episode()
@@ -264,8 +298,7 @@ class CarlaGame(object):
         self._timer = Timer()
         self._is_on_reverse = False
 
-    def _on_loop(self):
-
+    def _on_loop(self,record = False, turbulence=0):
         measurements, sensor_data = self.client.read_data()
 
         if self._joystick_control == 1:
@@ -273,32 +306,30 @@ class CarlaGame(object):
         else:
             control = self._get_keyboard_control(pygame.key.get_pressed())
 
+        if turbulence != 0:
+            control.steer += turbulence
+
         if control is None:
             self._on_new_episode()
         elif self._enable_autopilot:
             self.client.send_control(measurements.player_measurements.autopilot_control)
         else:
             self.client.send_control(control)
-        # if 'CameraRGB' in sensor_data:
-        #     print('CameraRGB')
-        # if 'CameraDepth' in sensor_data:
-        #     print('CameraDepth')
-        # if 'CameraSemSeg' in sensor_data:
-        #     print('CameraSemSeg')
-        # if 'Lidar32' in sensor_data:
-        #     print('Lidar32')
+        self._on_record(measurements,sensor_data,control)
 
+    def _on_record(self, measurements, sensor_data, control):
+        self._create_file()
         if sensor_data and 'CameraRGB' in sensor_data \
                 and 'CameraDepth' in sensor_data \
                 and 'CameraSemSeg' in sensor_data \
-                and 'Lidar32' in sensor_data :
+                and 'Lidar32' in sensor_data:
             sensors, targets_data = record_train_data(measurements, sensor_data)
             self.rgb_file[self.index_file, :, :, :] = sensors['CameraRGB']
             self.seg_file[self.index_file, :, :] = sensors['CameraSemSeg']
             self.depth_file[self.index_file, :, :] = sensors['CameraDepth']
             self.lidar_file[self.index_file, :, :] = sensors['Lidar32']
             self.targets_file[self.index_file, :] = targets_data
-            self.targets_file[self.index_file, 24] = self._command   #24代表的是command
+            self.targets_file[self.index_file, 24] = self._command  # 24代表的是command
             if self._enable_autopilot:
                 pass
             else:
@@ -308,9 +339,6 @@ class CarlaGame(object):
                 self.targets_file[self.index_file, 3] = control.hand_brake
                 self.targets_file[self.index_file, 4] = self._is_on_reverse
             self.index_file += 1
-            # print(self.index_file)
-
-
 
     def _get_keyboard_control(self, keys):
         """
