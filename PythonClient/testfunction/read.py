@@ -1,13 +1,10 @@
 import h5py
-import numpy as np
-from PIL import Image
 import cv2
 
-f = h5py.File('/media/kadn/DATA2/AgentHuman/SeqTrain/data_03663.h5','r')
-
+f = h5py.File('/home/kadn/data/episode_010/data_000000.h5','r')
 num = 100
-for num in range(100):
-    img=f['rgb'][num,:,:,:]
+for num in range(200):
+    img=f['rgb'] [num,:,:,:]
     # img = np.split()
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     cv2.imshow('good',img)

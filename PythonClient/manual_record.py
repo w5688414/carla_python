@@ -21,7 +21,7 @@ Use ARROWS or WASD keys for control.
     Space        : hand-brake
     P            : toggle autopilot
 
-    R            : restart level
+    R            : restart
 
 STARTING in a moment...
 """
@@ -85,7 +85,10 @@ LIDAR_WIDTH = 200
 LIDAR_HEIGHT = 200
 NUM = 200
 
-record_dir = '/home/kadn/test'
+CAM_WINDOW_WIDTH = 800
+CAM_WINDOW_HEIGHT = 600
+
+record_dir = '/home/kadn/data'
 
 
 def make_carla_settings(args):
@@ -100,9 +103,9 @@ def make_carla_settings(args):
         QualityLevel='Low')
     settings.randomize_seeds()
     camera0 = sensor.Camera('CameraRGB')
-    camera0.set_image_size(MINI_WINDOW_WIDTH, MINI_WINDOW_HEIGHT)
+    camera0.set_image_size(CAM_WINDOW_WIDTH, CAM_WINDOW_HEIGHT)
     camera0.set_position(2.0, 0.0, 1.4)
-    camera0.set_rotation(0.0, 0.0, 0.0)
+    camera0.set_rotation(-15.0, 0.0, 0.0)
     settings.add_sensor(camera0)
     camera1 = sensor.Camera('CameraDepth', PostProcessing='Depth')
     camera1.set_image_size(MINI_WINDOW_WIDTH, MINI_WINDOW_HEIGHT)
@@ -227,7 +230,7 @@ class CarlaGame(object):
                 else:
                     self._turbulence = 0
 
-                if frame % 10 == 0:
+                if frame % 4 == 0:
                     self._on_loop(record=True, turbulence=self._turbulence)
                 else:
                     self._on_loop(record=False, turbulence=self._turbulence)
@@ -248,7 +251,7 @@ class CarlaGame(object):
             filename = "data_{:0>6}.h5".format(num)
             filepath = self.pathdir + '/' + filename
             self.f = h5py.File(filepath, "w")
-            self.rgb_file = self.f.create_dataset("CameraRGB", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, 3), np.uint8)
+            self.rgb_file = self.f.create_dataset("rgb", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH, 3), np.uint8)
             self.seg_file = self.f.create_dataset("CameraSemSeg", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
             self.depth_file = self.f.create_dataset("CameraDepth", (NUM, MINI_WINDOW_HEIGHT, MINI_WINDOW_WIDTH ), np.uint8)
             self.lidar_file = self.f.create_dataset('Lidar32', (NUM, LIDAR_HEIGHT, LIDAR_WIDTH ), np.uint8)
@@ -292,7 +295,7 @@ class CarlaGame(object):
             self._city_name = scene.map_name
         number_of_player_starts = len(scene.player_start_spots)
         # player_start = np.random.randint(number_of_player_starts)
-        player_start = 74
+        player_start = 85
         print('Starting new episode...')
         self.client.start_episode(player_start)
         self._timer = Timer()
@@ -325,7 +328,7 @@ class CarlaGame(object):
                 and 'CameraSemSeg' in sensor_data \
                 and 'Lidar32' in sensor_data:
             sensors, targets_data = record_train_data(measurements, sensor_data)
-            self.rgb_file[self.index_file, :, :, :] = sensors['CameraRGB']
+            self.rgb_file[self.index_file, :, :, :] = sensors['rgb']
             self.seg_file[self.index_file, :, :] = sensors['CameraSemSeg']
             self.depth_file[self.index_file, :, :] = sensors['CameraDepth']
             self.lidar_file[self.index_file, :, :] = sensors['Lidar32']

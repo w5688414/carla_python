@@ -15,6 +15,7 @@ import logging
 import random
 import time
 
+
 from carla.client import make_carla_client
 from carla.sensor import Camera, Lidar
 from carla.settings import CarlaSettings
@@ -24,6 +25,7 @@ from carla import image_converter
 
 import h5py
 import numpy as np
+import scipy.misc
 import os
 import sys
 import termios
@@ -67,7 +69,8 @@ def record_train_data(measurements,sensor_data):
 
     ## Collect sensordata->sensors
     rgb_array = np.uint8(sensor_data['CameraRGB'].data)   # (88*200*3)(宽×高×通道)
-
+    rgb_array = rgb_array[115:510,:]
+    rgb_array = scipy.misc.imresize(rgb_array,[88,200])
     seg_array = sensor_data.get('CameraSemSeg', None).data
     depth_array = sensor_data.get('CameraDepth', None)
     depth_array = image_converter.depth_to_logarithmic_grayscale(depth_array)
@@ -83,7 +86,7 @@ def record_train_data(measurements,sensor_data):
     lidar_img_size = (200, 200)
     lidar_img = np.zeros(lidar_img_size)
     lidar_img[tuple(lidar_data.T)] = 255
-    sensors = {'CameraRGB':rgb_array, 'CameraSemSeg':seg_array, 'CameraDepth':depth_array,'Lidar32':lidar_img}
+    sensors = {'rgb':rgb_array, 'CameraSemSeg':seg_array, 'CameraDepth':depth_array,'Lidar32':lidar_img}
 
 
 
