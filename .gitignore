@@ -1,11 +1,14 @@
 CarlaUE4/
+core
 Engine/
 .idea/
 PythonClient/_benchmarks_results/
-PythonClient/__pycache__/
+PythonClient/build/
 PythonClient/carla/__pycache__/
 PythonClient/carla/agent/__pycache__/
 PythonClient/carla/driving_benchmark/__pycache__/
 PythonClient/carla/driving_benchmark/experiment_suites/__pycache__/
 PythonClient/carla/planner/__pycache__/
-core
+PythonClient/carla_client.egg-info
+PythonClient/dist
+PythonClient/__pycache__/
