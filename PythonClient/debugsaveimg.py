@@ -90,6 +90,10 @@ def record_train_data(measurements,sensor_data):
 
 
 
+
+
+
+
     ## collect measurementdata->targets
     player_measurements = measurements.player_measurements
     control = measurements.player_measurements.autopilot_control

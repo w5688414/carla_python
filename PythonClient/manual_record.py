@@ -88,7 +88,7 @@ NUM = 200
 CAM_WINDOW_WIDTH = 800
 CAM_WINDOW_HEIGHT = 600
 
-record_dir = '../../data'
+record_dir = '../../data/f148_0813/ct'
 
 
 def make_carla_settings(args):
@@ -97,10 +97,10 @@ def make_carla_settings(args):
     settings.set(
         SynchronousMode=True,
         SendNonPlayerAgentsInfo=False,
-        NumberOfVehicles=0,
+        NumberOfVehicles=30,
         NumberOfPedestrians=0,
         WeatherId=1,
-        QualityLevel='Low')
+        QualityLevel='Epic')
     settings.randomize_seeds()
     camera0 = sensor.Camera('CameraRGB')
     camera0.set_image_size(CAM_WINDOW_WIDTH, CAM_WINDOW_HEIGHT)
@@ -169,7 +169,7 @@ class CarlaGame(object):
         self.index_file = 200
         self._command = 2
         self.number_of_episodes = 2
-        self.frames_per_cut = 4200
+        self.frames_per_cut = 20000
         self._joystick_control = 0
         self._turbulence_start_frame = 0
         self._turbulence_stop_frame = 0
@@ -195,8 +195,8 @@ class CarlaGame(object):
                 if self._check_pygame() == False:
                     return
                 # add turbulence
-                if frame % 300 == 0:
-                    if np.random.rand() > 0.0:
+                if frame % 100 == 0:
+                    if np.random.rand() > 0.8:
                         self._turbulence_sym = random.randrange(-1, 2, 2)
                         self._turbulence_start_frame = frame
                         self._turbulence_stop_frame = frame + np.random.randint(20,40)
@@ -204,10 +204,10 @@ class CarlaGame(object):
                         self._turbulence_sym = 0
                         self._turbulence_start_frame = -1
                         self._turbulence_stop_frame = -1
-                if frame == self._turbulence_start_frame:
-                    print('turbulence start')
-                if frame == self._turbulence_stop_frame:
-                    print('turbulence stop')
+                # if frame == self._turbulence_start_frame:
+                #     print('turbulence start')
+                # if frame == self._turbulence_stop_frame:
+                #     print('turbulence stop')
                 if self._turbulence_start_frame < frame < self._turbulence_stop_frame :
                     self._turbulence = self._turbulence_sym * turbulence_fullTriangle(frame - self._turbulence_start_frame,
                                                                                           self._turbulence_stop_frame - self._turbulence_start_frame,
@@ -217,10 +217,12 @@ class CarlaGame(object):
                 # if frame == 60:
                     # print('Record process will start in 40 frames')
 
-                if frame % 10 == 0 and frame > 100:
+                if frame % 1 == 0 and frame > 100:
                     self._on_loop(record=True, turbulence=self._turbulence)
                 else:
                     self._on_loop(record=False, turbulence=self._turbulence)
+
+                # time.sleep(0.06)    #保持与官方相同的统计速度，每一次采集数据时，1m内保存的数据量大概为2-3，原来不加sleep的情况会是4-5
 
         pygame.quit()
 
@@ -275,7 +277,7 @@ class CarlaGame(object):
             self._city_name = scene.map_name
         number_of_player_starts = len(scene.player_start_spots)
         # player_start = np.random.randint(number_of_player_starts)
-        player_start = 122
+        player_start = 148
         print('Starting new episode...')
         self.client.start_episode(player_start)
         self._is_on_reverse = False
@@ -284,10 +286,9 @@ class CarlaGame(object):
         measurements, sensor_data = self.client.read_data()
 
         if self._joystick_control == 1:
-            # control = self._get_XBOX_control(pygame.joystick.Joystick(0))
-            control = self._get_joystick_control(pygame.joystick.Joystick(0))
-        else:
-            control = self._get_keyboard_control(pygame.key.get_pressed())
+            control = self._get_XBOX_control(pygame.joystick.Joystick(0))
+            # control = self._get_joystick_control(pygame.joystick.Joystick(0))
+            self._get_keyboard_control(pygame.key.get_pressed())
 
         # this code means first record keyboard or joystick, then add turbulence to it, and send control to server.
         if record :
@@ -328,16 +329,49 @@ class CarlaGame(object):
 
     def _get_XBOX_control(self, joystick):
         control = VehicleControl()
-        control.throttle = 0.5 * (joystick.get_axis(5) + 1)
+        control.throttle = 0.4 * (joystick.get_axis(5) + 1)
+        if control.throttle > 0.6:
+            control.throttle = 0.6
+        # if control.throttle <0.3:
+        #     control.throttle = 0
+        # elif control.throttle<0.7:
+        #     control.throttle = 0.5
+        # else:
+        #     control.throttle =1.0
+
 
         control.brake = 0.5 * (joystick.get_axis(2) + 1)
+        control.brake = max(0, control.brake - 0.1)
 
         control.steer = joystick.get_axis(0)
+        if(abs(control.steer)<0.05):
+            control.steer = 0
+        if control.steer <=-0.05:
+            control.steer += 0.05
+        if control.steer >=0.05:
+            control.steer -= 0.05
         control.steer = 0.8 * control.steer
 
         control.reverse = self._is_on_reverse
+        # command = joystick.get_hat(0)
+        # if command[0] == -1:
+        #     self._command = 3
+        # elif command[0] == 1:
+        #     self._command = 4
+        # if command[1] == -1:
+        #     self._command = 5
+        # elif command[1] == 1:
+        #     self._command = 2
+        # return control
+        if joystick.get_axis(3) > 0.5:
+            self._command = 4
+        elif joystick.get_axis(3) < -0.5:
+            self._command = 3
+        elif joystick.get_axis(4) > 0.5:
+            self._command = 5
+        elif joystick.get_axis(4) < -0.5:
+            self._command = 2
         return control
-
     def _get_keyboard_control(self, keys):
         """
         Return a VehicleControl message based on the pressed keys. Return None
