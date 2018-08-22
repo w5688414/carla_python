@@ -1,7 +1,7 @@
 import h5py
 import cv2
 
-f = h5py.File('../../data8_8/episode_001/data_000000.h5','r')
+f = h5py.File('/media/kadn/DATA2/AgentHuman/SeqTrain/data_03696.h5','r')
 
 for num in range(200):
     img=f['rgb'] [num,:,:,:]

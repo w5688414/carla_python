@@ -46,6 +46,7 @@ def view_start_positions(args):
             sys.exit(1)
 
         fig, ax = plt.subplots(1)
+        plt.ion()
 
         ax.imshow(image)
 
@@ -54,26 +55,38 @@ def view_start_positions(args):
         else:
             positions_to_plot = map(int, args.positions.split(','))
 
-        for position in positions_to_plot:
-            # Check if position is valid
-            if position >= len(scene.player_start_spots):
-                raise RuntimeError('Selected position is invalid')
-
-            # Convert world to pixel coordinates
-            pixel = carla_map.convert_to_pixel([scene.player_start_spots[position].location.x,
-                                                scene.player_start_spots[position].location.y,
-                                                scene.player_start_spots[position].location.z])
-
-            circle = Circle((pixel[0], pixel[1]), 12, color='r', label='A point')
+        while True:
+            measurements, sensor_data = client.read_data()
+            current_x = measurements.player_measurements.transform.location.x
+            current_y = measurements.player_measurements.transform.location.y
+            pixel = carla_map.convert_to_pixel([current_x,current_y,0])
+            circle = Circle((pixel[0], pixel[1]), 12, color='k', label='car')
             ax.add_patch(circle)
+            plt.pause(0.05)
 
-            if not args.no_labels:
-                plt.text(pixel[0], pixel[1], str(position), size='x-small')
+        #
+        # for position in positions_to_plot:
+        #     # Check if position is valid
+        #     if position != 110:
+        #         continue
+        #     if position >= len(scene.player_start_spots):
+        #         raise RuntimeError('Selected position is invalid')
+        #
+        #     # Convert world to pixel coordinates
+        #     pixel = carla_map.convert_to_pixel([scene.player_start_spots[position].location.x,
+        #                                         scene.player_start_spots[position].location.y,
+        #                                         scene.player_start_spots[position].location.z])
+        #
+        #     circle = Circle((pixel[0], pixel[1]), 12, color='r', label='A point')
+        #     ax.add_patch(circle)
 
-        plt.axis('off')
-        plt.show()
+            # if not args.no_labels:
+            #     plt.text(pixel[0], pixel[1], str(position), size='x-small')
 
-        fig.savefig('town_positions.pdf', orientation='landscape', bbox_inches='tight')
+        # plt.axis('off')
+        # plt.show()
+
+        # fig.savefig('town_positions.pdf', orientation='landscape', bbox_inches='tight')
 
 
 def main():
@@ -91,7 +104,7 @@ def main():
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
-        default=2000,
+        default=2001,
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(

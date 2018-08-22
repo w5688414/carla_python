@@ -1,3 +1,0 @@
-./CarlaUE4.sh -carla-server -windowed -ResX=1300 -ResY=700
-./CarlaUE4.sh -carla-settings=Example.CarlaSettings.ini -windowed -ResX=1300 -ResY=700
-
